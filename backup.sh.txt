@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Variables
+SOURCE_DIR="/home/kali/archive/backup"  # Path to the directory you want to back up
+BACKUP_DIR="/home/kali/member"          # Backup destination
+DATE=$(date +"%Y%m%d_%H%M%S")
+CHECKSUM_FILE="/tmp/backup_checksum.txt"  # Temporary file to store the last checksum
+NO_CHANGE_MESSAGE="$BACKUP_DIR/no_changes_$DATE.txt"  # File to indicate no changes
+
+check_source_directory() {
+    if [ ! -d "$SOURCE_DIR" ]; then
+        echo "Source directory does not exist: $SOURCE_DIR"
+        exit 1
+    else
+        echo "Source directory found: $SOURCE_DIR. Proceeding with backup."
+    fi
+}
+
+# Check if files have changed
+check_files_changed() {
+    CURRENT_CHECKSUM=$(find "$SOURCE_DIR" -type f -exec md5sum {} + | sort | md5sum | awk '{ print $1 }')
+
+    if [ -f "$CHECKSUM_FILE" ]; then
+        LAST_CHECKSUM=$(cat "$CHECKSUM_FILE")
+    else
+        LAST_CHECKSUM=""
+    fi
+
+    if [ "$CURRENT_CHECKSUM" != "$LAST_CHECKSUM" ]; then
+        echo "$CURRENT_CHECKSUM" > "$CHECKSUM_FILE"
+        return 0  # Files have changed
+    else
+        echo "No changes detected in $SOURCE_DIR. Skipping backup."
+        echo "No changes detected on $(date)" > "$NO_CHANGE_MESSAGE"
+        return 1  # No changes
+    fi
+}
+
+# Backup function
+backup_directory() {
+    BACKUP_PATH="$BACKUP_DIR/backup_$DATE"
+    echo "Starting backup to $BACKUP_PATH: $(date)"
+    cp -r "$SOURCE_DIR" "$BACKUP_PATH"
+    if [ $? -eq 0 ]; then
+        echo "Backup completed successfully: $(date)"
+    else
+        echo "Backup failed: $(date)"
+    fi
+}
+
+# Main script execution
+check_source_directory
+
+if check_files_changed; then
+    backup_directory
+fi
